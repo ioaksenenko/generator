@@ -3,6 +3,40 @@
 #include <locale.h>
 #include <math.h>
 
+const float QUANTILIES[31][7] = {
+	{0.01, 0.025, 0.05, 0.95, 0.975, 0.99},
+	{6.6, 5.0, 3.8, 0.0039, 0.00098, 0.00016},
+	{9.2, 7.4, 6.0, 0.103, 0.051, 0.020},
+	{11.3, 9.4, 7.8, 0.352, 0.216, 0.115},
+	{13.3, 11.1, 9.5, 0.711, 0.484, 0.297},
+	{15.1, 12.8, 11.1, 1.15, 0.831, 0.554},
+	{16.8, 14.4, 12.6, 1.64, 1.24, 0.872},
+	{18.5, 16.0, 14.1, 2.17, 1.69, 1.24},
+	{20.1, 17.5, 15.5, 2.73, 2.18, 1.65},
+	{21.7, 19.0, 16.9, 3.33, 2.70, 2.09},
+	{23.2, 20.5, 18.3, 3.94, 3.25, 2.56},
+	{24.7, 21.9, 19.7, 4.57, 3.82, 3.05},
+	{26.2, 23.3, 21.0, 5.23, 4.40, 3.57},
+	{27.7, 24.7, 22.4, 5.89, 5.01, 4.11},
+	{29.1, 26.1, 23.7, 6.57, 5.63, 4.66},
+	{30.6, 27.5, 25.0, 7.26, 6.26, 5.23},
+	{32.0, 28.8, 26.3, 7.96, 6.91, 5.81},
+	{33.4, 30.2, 27.6, 8.67, 7.56, 6.41},
+	{34.8, 31.5, 28.9, 9.39, 8.23, 7.01},
+	{36.2, 32.9, 30.1, 10.1, 8.91, 7.63},
+	{37.6, 34.2, 31.4, 10.9, 9.59, 8.26},
+	{38.9, 35.5, 32.7, 11.6, 10.3, 8.26},
+	{40.3, 36.8, 33.9, 12.3, 11.0, 9.54},
+	{41.6, 38.1, 35.2, 13.1, 11.7, 10.2},
+	{43.0, 39.4, 36.4, 13.8, 12.4, 10.9},
+	{44.3, 40.6, 37.7, 14.6, 13.1, 11.5},
+	{45.6, 41.9, 38.9, 15.4, 13.8, 12.2},
+	{47.0, 43.3, 40.1, 16.2, 14.6, 12.9},
+	{48.3, 44.5, 41.3, 16.9, 15.3, 13.6},
+	{49.6, 45.7, 42.6, 17.7, 16.0, 14.3},
+	{50.9, 47.0, 43.8, 18.5, 16.8, 15.0}
+};
+
 
 typedef struct {
 	int* bits;
@@ -210,26 +244,12 @@ int test_pearson(sequence_t seq, int intervals_number, float significance) {
 	for (int i = 0; i < intervals_number; i++) {
 		stat += pow(frequencies[i] - theoretical_frequencу, 2) / theoretical_frequencу;
 	}
-	float quantiles[31][7] = {
-		{0.01, 0.025, 0.05, 0.95, 0.975, 0.99},
-		{6.6, 5.0, 3.8, 0.0039, 0.00098, 0.00016},
-		{9.2, 7.4, 6.0, 0.103, 0.051, 0.020},
-		{11.3, 9.4, 7.8, 0.352, 0.216, 0.115},
-		{13.3, 11.1, 9.5, 0.711, 0.484, 0.297},
-		{15.1, 12.8, 11.1, 1.15, 0.831, 0.554},
-		{16.8, 14.4, 12.6, 1.64, 1.24, 0.872},
-		{18.5, 16.0, 14.1, 2.17, 1.69, 1.24},
-		{20.1, 17.5, 15.5, 2.73, 2.18, 1.65},
-		{21.7, 19.0, 16.9, 3.33, 2.70, 2.09},
-		{23.2, 20.5, 18.3, 3.94, 3.25, 2.56},
-		{24.7, 21.9, 19.7, 4.57, 3.82, 3.05}
-	};
 	int freedom_degrees = 0;
 	int k = intervals_number - freedom_degrees - 1;
 	float quantile = 0;
 	for (int i = 0; i < 7; i++) {
-		if (fabs(quantiles[0][i] - significance) < 1E-10) {
-			quantile = quantiles[k][i];
+		if (fabs(QUANTILIES[0][i] - significance) < 1E-10) {
+			quantile = QUANTILIES[k][i];
 		}
 	}
 	if (fabs(quantile - 0.0) < 1E-10) {
@@ -240,43 +260,69 @@ int test_pearson(sequence_t seq, int intervals_number, float significance) {
 }
 
 
-int test_unlinked_series_method(sequence_t seq) {
-	int res = 1;
-	int seq_length = seq.length * seq.elements[0].binary_number.length;
-	int* bin_seq = (int*)malloc(seq_length * sizeof(int));
+binary_t to_binary_sequence(sequence_t seq) {
+	unsigned long long int length = 0;
+	for (int i = 0; i < seq.length; i++) {
+		length += seq.elements[i].binary_number.length;
+	}
+	binary_t res = (binary_t){
+		.bits = (int*)malloc(length * sizeof(int)),
+		.length = length
+	};
 	for (int i = 0; i < seq.length; i++) {
 		for (int j = 0; j < seq.elements[i].binary_number.length; j++) {
-			bin_seq[i * seq.elements[i].binary_number.length + j] = seq.elements[i].binary_number.bits[j];
+			res.bits[i * seq.elements[i].binary_number.length + j] = seq.elements[i].binary_number.bits[j];
 		}
 	}
-	for (int i = 1; i < floor(log2(seq_length)); i++) {
+	return res;
+}
+
+
+int test_unlinked_series_method(sequence_t seq, float significance) {
+	binary_t bin_seq = to_binary_sequence(seq);
+	for (int i = 1; i < floor(log2(bin_seq.length)); i++) {
 		int size = pow(2, i);
 		int* n = (int*)malloc(size * sizeof(int));
-		for (int j = 0; j < size - 1; j++) {
+		for (int j = 0; j < size; j++) {
 			n[j] = 0;
 		}
 		int k = 0;
 		int tmp = 0;
-		while (k < floor(seq_length * 1.0 / i)) {
-			int j = 1;
+		while (k < floor(bin_seq.length * 1.0 / i)) {
+			int j = 0;
 			int tmp = 1;
 			int sum = 0;
 			while (j < i) {
-				sum += tmp * bin_seq[k * i + j];
+				sum += tmp * bin_seq.bits[k * i + j];
 				tmp *= 2;
 				j++;
 			}
 			n[sum]++;
 			k++;
 		}
-		tmp = floor(seq_length * 1.0 / i);
-		for (int j = 0; j < size - 1; j++) {
-			if (n[j] < tmp - 1 || n[j] < tmp + 1) {
-				res = 0;
+		float stat = 0.0;
+		float theoretical_frequencу = floor(bin_seq.length * 1.0 / i) * 1.0 / size;
+		for (int j = 0; j < size; j++) {
+			stat += pow(n[j] - theoretical_frequencу, 2);
+		}
+		stat /= theoretical_frequencу;
+		int freedom_degrees = 0;
+		k = size - freedom_degrees - 1;
+		float quantile = 0;
+		for (int i = 0; i < 7; i++) {
+			if (fabs(QUANTILIES[0][i] - significance) < 1E-10) {
+				quantile = QUANTILIES[k][i];
 			}
 		}
+		if (fabs(quantile - 0.0) < 1E-10) {
+			printf("Заданный уровень значимости не поддерживается.\nВозможные варианты: 0.01, 0.025, 0.05, 0.95, 0.975, 0.99.\n");
+			exit(EXIT_FAILURE);
+		}
+		if (stat > quantile) {
+			return 0;
+		}
 	}
-	return res;
+	return 1;
 }
 
 
@@ -302,7 +348,7 @@ int main() {
 	printf("Тестирование младших битов: %c\n", is_ok ? '+' : '-');
 	is_ok = test_pearson(seq, 10, 0.01);
 	printf("Тестирование случайности последовательности по критерию Пирсона: %c\n", is_ok ? '+' : '-');
-	is_ok = test_unlinked_series_method(seq);
+	is_ok = test_unlinked_series_method(seq, 0.01);
 	printf("Тестирование методом несцепленных серий: %c\n", is_ok ? '+' : '-');
 
 	return 0;
