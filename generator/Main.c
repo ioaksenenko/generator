@@ -2,6 +2,8 @@
 #include <Windows.h>
 #include <locale.h>
 #include <math.h>
+#include <time.h>
+#include <stdlib.h>
 
 const float QUANTILIES[31][7] = {
 	{0.01, 0.025, 0.05, 0.95, 0.975, 0.99},
@@ -38,13 +40,13 @@ const float QUANTILIES[31][7] = {
 };
 
 
-typedef struct {
+typedef struct binary_t {
 	int* bits;
 	unsigned long long int length;
 } binary_t;
 
 
-typedef struct {
+typedef struct element_t {
 	unsigned long long int number; // число в десятичном виде
 	unsigned long long int frequency; // частость числа в последовательности
 	float probability; // вероятность числа в последовательности
@@ -52,7 +54,7 @@ typedef struct {
 } element_t;
 
 
-typedef struct {
+typedef struct sequence_t {
 	element_t* elements;
 	unsigned long long int length;
 } sequence_t;
@@ -119,47 +121,40 @@ sequence_t calc_probabilities(sequence_t seq) {
 }
 
 
+unsigned long long int period(unsigned long long int x, unsigned long long int a, unsigned long long int c, unsigned long long int m) {
+	unsigned long long int res = 0;
+	unsigned long long int next = x;
+	do {
+		next = lcg(next, a, c, m);
+		res++;
+	} while (next != x);
+	return res;
+}
+
+
 sequence_t generate(unsigned long long int x, unsigned long long int a, unsigned long long int c, unsigned long long int m) {
+	unsigned long long int length = period(x, a, c, m);
 	sequence_t res = (sequence_t){
-		.elements = (element_t*)malloc((m + 1) * sizeof(element_t)),
-		.length = 0
+		.elements = (element_t*)malloc(length * sizeof(element_t)),
+		.length = length
 	};
-	res.elements[res.length] = (element_t){
+	res.elements[0] = (element_t){
 		.number = x,
 		.frequency = 0,
 		.probability = 0,
 		.binary_number = to_binary(x)
 	};
-	unsigned long long int max_bin_length = res.elements[res.length].binary_number.length;
-	do {
-		unsigned long long int number = lcg(res.elements[res.length].number, a, c, m);
-		res.elements[++res.length] = (element_t){
+	for (int i = 1; i < length; i++) {
+		unsigned long long int number = lcg(res.elements[i - 1].number, a, c, m);
+		res.elements[i] = (element_t){
 			.number = number,
 			.frequency = 0,
-			.probability = 0,
+			.probability = 0.0,
 			.binary_number = to_binary(number)
 		};
-		if (res.elements[res.length].binary_number.length > max_bin_length) {
-			max_bin_length = res.elements[res.length].binary_number.length;
-		}
-	} while (res.elements[res.length].number != res.elements[0].number);
-	for (unsigned long long int i = 0; i < res.length; i++) {
-		binary_t binary_number = (binary_t){
-			.bits = (int*)malloc((max_bin_length) * sizeof(int)),
-			.length = max_bin_length
-		};
-		for (int j = binary_number.length - 1, k = res.elements[i].binary_number.length - 1; j >= 0; j--, k--) {
-			binary_number.bits[j] = k >= 0 ? res.elements[i].binary_number.bits[k] : 0;
-		}
-		res.elements[i].binary_number = binary_number;
-	}
+	};
 	calc_probabilities(res);
 	return res;
-}
-
-
-unsigned long long int period(sequence_t seq) {
-	return seq.length;
 }
 
 
@@ -176,8 +171,7 @@ void print_sequence(sequence_t seq) {
 
 
 int test_period(sequence_t seq, unsigned long long int m) {
-	unsigned long long int k = period(seq);
-	return k == m;
+	return seq.length == m;
 }
 
 
@@ -246,7 +240,7 @@ int test_pearson(sequence_t seq, int intervals_number, float significance) {
 	}
 	int freedom_degrees = 0;
 	int k = intervals_number - freedom_degrees - 1;
-	float quantile = 0;
+	float quantile = 0.0;
 	for (int i = 0; i < 7; i++) {
 		if (fabs(QUANTILIES[0][i] - significance) < 1E-10) {
 			quantile = QUANTILIES[k][i];
@@ -269,9 +263,10 @@ binary_t to_binary_sequence(sequence_t seq) {
 		.bits = (int*)malloc(length * sizeof(int)),
 		.length = length
 	};
+	int index = 0;
 	for (int i = 0; i < seq.length; i++) {
 		for (int j = 0; j < seq.elements[i].binary_number.length; j++) {
-			res.bits[i * seq.elements[i].binary_number.length + j] = seq.elements[i].binary_number.bits[j];
+			res.bits[index++] = seq.elements[i].binary_number.bits[j];
 		}
 	}
 	return res;
@@ -287,7 +282,6 @@ int test_unlinked_series_method(sequence_t seq, float significance) {
 			n[j] = 0;
 		}
 		int k = 0;
-		int tmp = 0;
 		while (k < floor(bin_seq.length * 1.0 / i)) {
 			int j = 0;
 			int tmp = 1;
@@ -335,9 +329,17 @@ int main() {
 	unsigned long long int m = 1024;
 	// 18446744073709551616
 
-	unsigned long long int x = 0;
+	srand(time(NULL));
+	unsigned long long int x = rand() % m;
+	printf("%llu\n", x);
 
 	sequence_t seq = generate(x, a, c, m);
+	/*printf("\n");
+	binary_t bin_seq = to_binary_sequence(seq);
+	for (int i = 0; i < bin_seq.length; i++) {
+		printf("%d", bin_seq.bits[i]);
+	}*/
+	
 	// print_sequence(seq);
 
 	int is_ok = test_period(seq, m);
