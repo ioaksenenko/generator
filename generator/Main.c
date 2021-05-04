@@ -132,6 +132,32 @@ unsigned long long int period(unsigned long long int x, unsigned long long int a
 }
 
 
+unsigned long long int  max_number_length(sequence_t seq) {
+	unsigned long long int res = 0;
+	for (unsigned long long int i = 0; i < seq.length; i++) {
+		if (res < seq.elements[i].binary_number.length) {
+			res = seq.elements[i].binary_number.length;
+		}
+	}
+	return res;
+}
+
+
+void aligning_number_length(sequence_t seq) {
+	unsigned long long int length = max_number_length(seq);
+	for (unsigned long long int i = 0; i < seq.length; i++) {
+		binary_t binary_number = (binary_t){
+			.bits = (int*)malloc((length) * sizeof(int)),
+			.length = length
+		};
+		for (int j = binary_number.length - 1, k = seq.elements[i].binary_number.length - 1; j >= 0; j--, k--) {
+			binary_number.bits[j] = k >= 0 ? seq.elements[i].binary_number.bits[k] : 0;
+		}
+		seq.elements[i].binary_number = binary_number;
+	}
+}
+
+
 sequence_t generate(unsigned long long int x, unsigned long long int a, unsigned long long int c, unsigned long long int m) {
 	unsigned long long int length = period(x, a, c, m);
 	sequence_t res = (sequence_t){
@@ -154,6 +180,7 @@ sequence_t generate(unsigned long long int x, unsigned long long int a, unsigned
 		};
 	};
 	calc_probabilities(res);
+	aligning_number_length(res);
 	return res;
 }
 
@@ -297,20 +324,23 @@ int test_unlinked_series_method(sequence_t seq, float significance) {
 		float stat = 0.0;
 		float theoretical_frequencу = floor(bin_seq.length * 1.0 / i) * 1.0 / size;
 		for (int j = 0; j < size; j++) {
-			stat += pow(n[j] - theoretical_frequencу, 2);
+			stat += pow(n[j] - theoretical_frequencу, 2) / theoretical_frequencу;
 		}
-		stat /= theoretical_frequencу;
-		int freedom_degrees = 0;
-		k = size - freedom_degrees - 1;
-		float quantile = 0;
-		for (int i = 0; i < 7; i++) {
-			if (fabs(QUANTILIES[0][i] - significance) < 1E-10) {
-				quantile = QUANTILIES[k][i];
+		int params_num = 0;
+		int freedom_degrees = size - params_num - 1;
+		float quantile = 0.0;
+		if (freedom_degrees <= 30) {
+			for (int i = 0; i < 7; i++) {
+				if (fabs(QUANTILIES[0][i] - significance) < 1E-10) {
+					quantile = QUANTILIES[freedom_degrees][i];
+				}
 			}
-		}
-		if (fabs(quantile - 0.0) < 1E-10) {
-			printf("Заданный уровень значимости не поддерживается.\nВозможные варианты: 0.01, 0.025, 0.05, 0.95, 0.975, 0.99.\n");
-			exit(EXIT_FAILURE);
+			if (fabs(quantile - 0.0) < 1E-10) {
+				printf("Заданный уровень значимости не поддерживается.\nВозможные варианты: 0.01, 0.025, 0.05, 0.95, 0.975, 0.99.\n");
+				exit(EXIT_FAILURE);
+			}
+		} else {
+			return 1;
 		}
 		if (stat > quantile) {
 			return 0;
@@ -323,10 +353,10 @@ int test_unlinked_series_method(sequence_t seq, float significance) {
 int main() {
 	setlocale(LC_ALL, "Russian");
 
-	unsigned long long int a = 16777325;
-	unsigned long long int c = 3;
+	unsigned long long int a = 1103515245;
+	unsigned long long int c = 12345;
 	// unsigned long long int m = 4294967296;
-	unsigned long long int m = 1024;
+	unsigned long long int m = 65536;
 	// 18446744073709551616
 
 	srand(time(NULL));
@@ -340,7 +370,7 @@ int main() {
 		printf("%d", bin_seq.bits[i]);
 	}*/
 	
-	// print_sequence(seq);
+	//print_sequence(seq);
 
 	int is_ok = test_period(seq, m);
 	printf("Тестирование периода: %c\n", is_ok ? '+' : '-');
