@@ -213,21 +213,31 @@ int test_dispersion(sequence_t seq) {
 
 
 int test_lsb(sequence_t seq, float significance) {
+	int units_number = 0;
+	int zeros_number = 0;
+	int sum_checked_bits_numer = 0;
 	for (int i = 0; i < seq.length; i++) {
-		int units_number = 0;
-		int zeros_number = 0;
-		int bytes_numer = ceil(seq.elements[i].binary_number.length / 8.0);
-		int checked_bits_numer = bytes_numer / 2.0 * 8;
-		for (int j = seq.elements[i].binary_number.length - checked_bits_numer; j < seq.elements[i].binary_number.length; j++) {
+		int checked_bits_numer = ceil(seq.elements[i].binary_number.length / 2.0);
+		sum_checked_bits_numer += checked_bits_numer;
+		for (int j = checked_bits_numer; j < seq.elements[i].binary_number.length; j++) {
 			units_number += seq.elements[i].binary_number.bits[j];
 			zeros_number += !seq.elements[i].binary_number.bits[j];
 		}
-		// printf("Нулей: %d, Единиц: %d, Отклонение: %f\n", zeros_number, units_number, abs(units_number - zeros_number) * 1.0 / checked_bits_numer);
-		if (abs(units_number - zeros_number) * 1.0 / checked_bits_numer > significance) {
-			return 0;
+	}
+	float theoretical_frequencу = sum_checked_bits_numer / 2.0;
+	float stat = (pow(units_number - theoretical_frequencу, 2) + pow(zeros_number - theoretical_frequencу, 2)) / theoretical_frequencу;
+	int freedom_degrees = 1;
+	float quantile = 0.0;
+	for (int i = 0; i < 7; i++) {
+		if (fabs(QUANTILIES[0][i] - significance) < 1E-10) {
+			quantile = QUANTILIES[freedom_degrees][i];
 		}
 	}
-	return 1;
+	if (fabs(quantile - 0.0) < 1E-10) {
+		printf("Заданный уровень значимости не поддерживается.\nВозможные варианты: 0.01, 0.025, 0.05, 0.95, 0.975, 0.99.\n");
+		exit(EXIT_FAILURE);
+	}
+	return stat <= quantile;
 }
 
 
@@ -265,12 +275,12 @@ int test_pearson(sequence_t seq, int intervals_number, float significance) {
 	for (int i = 0; i < intervals_number; i++) {
 		stat += pow(frequencies[i] - theoretical_frequencу, 2) / theoretical_frequencу;
 	}
-	int freedom_degrees = 0;
-	int k = intervals_number - freedom_degrees - 1;
+	int params_num = 0;
+	int freedom_degrees = intervals_number - params_num - 1;
 	float quantile = 0.0;
 	for (int i = 0; i < 7; i++) {
 		if (fabs(QUANTILIES[0][i] - significance) < 1E-10) {
-			quantile = QUANTILIES[k][i];
+			quantile = QUANTILIES[freedom_degrees][i];
 		}
 	}
 	if (fabs(quantile - 0.0) < 1E-10) {
@@ -300,7 +310,7 @@ binary_t to_binary_sequence(sequence_t seq) {
 }
 
 
-int test_unlinked_series_method(sequence_t seq, float significance) {
+int test_unlinked_series(sequence_t seq, float significance) {
 	binary_t bin_seq = to_binary_sequence(seq);
 	for (int i = 1; i < floor(log2(bin_seq.length)); i++) {
 		int size = pow(2, i);
@@ -360,7 +370,7 @@ int main() {
 	// 18446744073709551616
 
 	srand(time(NULL));
-	unsigned long long int x = rand() % m;
+	unsigned long long int x = m - rand() % m;
 	printf("%llu\n", x);
 
 	sequence_t seq = generate(x, a, c, m);
@@ -380,7 +390,7 @@ int main() {
 	printf("Тестирование младших битов: %c\n", is_ok ? '+' : '-');
 	is_ok = test_pearson(seq, 10, 0.01);
 	printf("Тестирование случайности последовательности по критерию Пирсона: %c\n", is_ok ? '+' : '-');
-	is_ok = test_unlinked_series_method(seq, 0.01);
+	is_ok = test_unlinked_series(seq, 0.01);
 	printf("Тестирование методом несцепленных серий: %c\n", is_ok ? '+' : '-');
 
 	return 0;
